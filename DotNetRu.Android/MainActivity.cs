@@ -6,17 +6,20 @@
     using Android.Content;
     using Android.Content.PM;
     using Android.OS;
+    using Android.Util;
 
     using DotNetRu.Droid.Helpers;
     using DotNetRu.Utils.Helpers;
 
     using FFImageLoading.Forms.Droid;
 
+    using Firebase;
+    using Firebase.Iid;
+    using Firebase.Messaging;
+
     using FormsToolkit.Droid;
 
     using ImageCircle.Forms.Plugin.Droid;
-
-    using Microsoft.AppCenter.Push;
 
     using Naxam.Controls.Platform.Droid;
 
@@ -112,7 +115,10 @@
 
             CachedImageRenderer.Init(enableFastRenderer: true);
 
-            Push.SetSenderId("89529747547");
+            FirebaseApp.InitializeApp(Android.App.Application.Context);
+            Log.Debug("AuditUpdate", "Firebase token: " + FirebaseInstanceId.Instance.Token);
+
+            FirebaseMessaging.Instance.SubscribeToTopic("AuditUpdate");
 
             this.LoadApplication(new Clients.UI.App());
             this.OnNewIntent(this.Intent);
