@@ -48,6 +48,8 @@ namespace DotNetRu.Clients.UI
             bool overwrite = savedAppVersion != currentAppVersion;        
             RealmService.Initialize(overwrite);
 
+            // uncomment this to update app by launch
+            // UpdateService.UpdateAudit().ConfigureAwait(false);
             Portable.Helpers.Settings.AppVersion = currentAppVersion;
 
             this.InitializeComponent();

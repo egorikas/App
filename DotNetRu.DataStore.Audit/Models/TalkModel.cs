@@ -41,7 +41,7 @@
         public DateTime? StartTime => DateTime.Now; // this.Sessions.First().StartTime.DateTime;
 
         [Obsolete("Room and other location&time info should move to session")]
-        public DateTime? EndTime => DateTime.Now; //this.Sessions.First().EndTime.DateTime;
+        public DateTime? EndTime => DateTime.Now; // this.Sessions.First().EndTime.DateTime;
 
         public string PresentationUrl { get; set; }
 
@@ -91,8 +91,9 @@
 
         public string SpeakerNames => string.Join(",", this.Speakers.Select(x => x.FullName));
 
-        // public ImageSource CommunityLogo => ImageSource.FromResource(
-        //    "DotNetRu.DataStore.Audit.Images.logos." + this.Sessions.First().Meetup.CommunityID + ".png");
+        [Obsolete("Logo should be taken from session, not talk")]
+        public ImageSource CommunityLogo => ImageSource.FromResource(
+           "DotNetRu.DataStore.Audit.Images.logos." + /*this.Sessions.First().Meetup.CommunityID*/ "DotNetRu" + ".png");
 
         // public IEnumerable<SessionModel> Sessions { get; set; }
     }

@@ -38,6 +38,7 @@
             // this.ToolbarItems.Add(this.filterItem);
             this.ListViewTalks.ItemSelected += async (sender, e) =>
                 {
+                    this.ListViewTalks.SelectedItem = null;
                     if (!(this.ListViewTalks.SelectedItem is SessionModel session))
                     {
                         return;
@@ -46,7 +47,6 @@
                     var sessionDetails = new TalkPage(session.Talk);
 
                     await NavigationService.PushAsync(this.Navigation, sessionDetails);
-                    this.ListViewTalks.SelectedItem = null;
                 };
         }
 
