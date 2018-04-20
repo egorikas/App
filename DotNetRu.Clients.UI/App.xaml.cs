@@ -47,7 +47,13 @@ namespace DotNetRu.Clients.UI
 
             AppResources.Culture = new CultureInfo(language.GetLanguageCode());
 
-            RealmService.Initialize();
+            var savedAppVersion = Portable.Helpers.Settings.AppVersion;
+            var currentAppVersion = DependencyService.Get<IAppVersionProvider>().AppVersion;
+
+            bool overwrite = savedAppVersion != currentAppVersion;
+            RealmService.Initialize(overwrite);
+
+            UpdateService.UpdateAudit().ConfigureAwait(false);
 
             this.InitializeComponent();
 
@@ -75,7 +81,7 @@ namespace DotNetRu.Clients.UI
             AppCenter.Start(
                 "ios=1e7f311f-1055-4ec9-8b00-0302015ab8ae;android=6f9a7703-8ca4-477e-9558-7e095f7d20aa;",
                 typeof(Analytics),
-                typeof(Crashes), 
+                typeof(Crashes),
                 typeof(Push));
 #endif
 

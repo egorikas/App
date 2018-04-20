@@ -19,7 +19,7 @@
                     return string.Empty;
                 }
 
-                return ((DateTime)value).ToEventTimeZone().Day;
+                return ((DateTime) value).ToEventTimeZone().Day;
             }
             catch (Exception ex)
             {

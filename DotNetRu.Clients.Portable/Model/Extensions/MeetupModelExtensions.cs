@@ -55,7 +55,7 @@
                 return AppResources.ToBeAnnounced;
             }
 
-            return meetupModel.StartTime.Value.ToString("d");
+            return $"{meetupModel.StartTime.Value.ToLocalTime().ToShortTimeString()} — {meetupModel.EndTime.Value.ToLocalTime().ToShortTimeString()}";
         }
 
         public static string GetDisplayTime(this MeetupModel e)

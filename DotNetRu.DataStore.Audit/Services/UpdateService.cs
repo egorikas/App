@@ -6,6 +6,7 @@
     using System.IO;
     using System.Linq;
     using System.Net.Http;
+    using System.Threading;
     using System.Threading.Tasks;
     using System.Xml.Serialization;
 
@@ -29,9 +30,15 @@
             {
                 Console.WriteLine("AuditUpdate. Started updating audit");
 
-                var auditVersion = RealmService.AuditRealm.All<AuditVersion>().Single();
+                string currentCommitSha;
+                using (var auditRealm = Realm.GetInstance("Audit.realm"))
+                {
+                    var auditVersion = auditRealm.All<AuditVersion>().Single();
+                    currentCommitSha = auditVersion.CommitHash;
+                }
 
-                Console.WriteLine("AuditUpdate. Current version is: " + auditVersion.CommitHash);
+                Console.WriteLine("AuditUpdate. Current synchronization context: " + SynchronizationContext.Current);
+                Console.WriteLine("AuditUpdate. Current version is: " + currentCommitSha);
 
                 var client = new GitHubClient(new ProductHeaderValue("DotNetRu"));
 
@@ -42,17 +49,20 @@
 
                 var contentUpdate = await client.Repository.Commit.Compare(
                                         DotNetRuAppRepositoryID,
-                                        auditVersion.CommitHash,
+                                        currentCommitSha,
                                         latestMasterCommitSha);
 
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
+                var httpClient = new HttpClient();
+
                 var streamTasks = contentUpdate.Files.Select(
                     async file => new UpdatedFile
                     {
                         Filename = file.Filename,
-                        Content = await new HttpClient().GetByteArrayAsync(file.RawUrl).ConfigureAwait(false)
+                        Content = await httpClient.GetByteArrayAsync(file.RawUrl)
+                                                        .ConfigureAwait(false)
                     });
                 var fileContents = await Task.WhenAll(streamTasks);
 
@@ -60,36 +70,44 @@
 
                 var xmlFiles = fileContents.Where(x => x.Filename.EndsWith(".xml")).ToList();
 
-                using (var trans = RealmService.AuditRealm.BeginWrite())
+                using (var auditRealm = Realm.GetInstance("Audit.realm"))
                 {
-                    RealmService.InitializeAutoMapper();
+                    using (var trans = auditRealm.BeginWrite())
+                    {
+                        var mapper = GetAutoMapper(auditRealm);
 
-                    UpdateModels<SpeakerEntity>(xmlFiles, "speakers");
-                    UpdateModels<FriendEntity>(xmlFiles, "friends");
-                    UpdateModels<VenueEntity>(xmlFiles, "venues");
-                    UpdateModels<TalkEntity>(xmlFiles, "talks");
-                    UpdateModels<MeetupEntity>(xmlFiles, "meetups");
+                        UpdateModels<SpeakerEntity>(mapper, auditRealm, xmlFiles, "speakers");
+                        UpdateModels<FriendEntity>(mapper, auditRealm, xmlFiles, "friends");
+                        UpdateModels<VenueEntity>(mapper, auditRealm, xmlFiles, "venues");
+                        UpdateModels<TalkEntity>(mapper, auditRealm, xmlFiles, "talks");
+                        UpdateModels<MeetupEntity>(mapper, auditRealm, xmlFiles, "meetups");
 
-                    var speakerPhotos = fileContents.Where(x => x.Filename.EndsWith("avatar.jpg"));
-                    UpdateSpeakerAvatars(speakerPhotos);
+                        var speakerPhotos = fileContents.Where(x => x.Filename.EndsWith("avatar.jpg"));
+                        UpdateSpeakerAvatars(auditRealm, speakerPhotos);
 
-                    auditVersion.CommitHash = latestMasterCommitSha;
-                    RealmService.AuditRealm.Add(auditVersion, update: true);
+                        var auditVersion = auditRealm.All<AuditVersion>().Single();
 
-                    trans.Commit();
+                        auditVersion.CommitHash = latestMasterCommitSha;
+                        auditRealm.Add(auditVersion, update: true);
+
+                        trans.Commit();
+                    }
                 }
 
                 stopwatch.Stop();
+                // TODO Send to App Center
                 Console.WriteLine("AuditUpdate. Finished! Time: " + stopwatch.Elapsed.ToString("g"));
             }
             catch (Exception e)
             {
                 Console.WriteLine("AuditUpdate. " + e);
                 new DotNetRuLogger().Report(e);
+
+                throw;
             }
         }
 
-        private static void UpdateSpeakerAvatars(IEnumerable<UpdatedFile> speakerPhotos)
+        private static void UpdateSpeakerAvatars(Realm auditRealm, IEnumerable<UpdatedFile> speakerPhotos)
         {
             foreach (UpdatedFile updatedFile in speakerPhotos)
             {
@@ -97,20 +115,20 @@
 
                 byte[] speakerAvatar = updatedFile.Content;
 
-                var speaker = RealmService.AuditRealm.Find<Speaker>(speakerID);
+                var speaker = auditRealm.Find<Speaker>(speakerID);
                 speaker.Avatar = speakerAvatar;
 
                 Console.WriteLine("AuditUpdate. Updated speaker avatar: " + updatedFile.Filename);
             }
         }
 
-        private static void UpdateModels<T>(IEnumerable<UpdatedFile> xmlFiles, string entityName)
+        private static void UpdateModels<T>(IMapper mapper, Realm auditRealm, IEnumerable<UpdatedFile> xmlFiles, string entityName)
         {
             var newEntities = xmlFiles.Where(x => x.Filename.StartsWith("db/" + entityName));
-            UpdateModels<T>(newEntities);
+            UpdateModels<T>(mapper, auditRealm, newEntities);
         }
 
-        private static void UpdateModels<T>(IEnumerable<UpdatedFile> files)
+        private static void UpdateModels<T>(IMapper mapper, Realm auditRealm, IEnumerable<UpdatedFile> files)
         {
             foreach (UpdatedFile file in files)
             {
@@ -120,16 +138,70 @@
 
                     Console.WriteLine($"AuditUpdate: updating {file.Filename}");
 
-                    var realmType = Mapper.Configuration.GetAllTypeMaps().Single(x => x.SourceType == typeof(T))
+                    var realmType = mapper.ConfigurationProvider.GetAllTypeMaps().Single(x => x.SourceType == typeof(T))
                         .DestinationType;
 
-                    var realmObject = Mapper.Map(xmlEntity, typeof(T), realmType);
+                    var realmObject = mapper.Map(xmlEntity, typeof(T), realmType);
 
-                    RealmService.AuditRealm.Add(realmObject as RealmObject, update: true);
+                    auditRealm.Add(realmObject as RealmObject, update: true);
 
                     Console.WriteLine($"AuditUpdate. Updated {file.Filename}");
                 }
             }
+        }
+
+        private static IMapper GetAutoMapper(Realm auditRealm)
+        {
+            var config = new MapperConfiguration(
+                cfg =>
+                {
+                    cfg.CreateMap<SpeakerEntity, Speaker>().AfterMap(
+                        (src, dest) =>
+                        {
+                            var speakerID = src.Id;
+                            var existingSpeaker = auditRealm.Find<Speaker>(speakerID);
+                            if (existingSpeaker != null)
+                            {
+                                dest.Avatar = existingSpeaker.Avatar;
+                            }
+                        });
+                    cfg.CreateMap<VenueEntity, Venue>();
+                    cfg.CreateMap<FriendEntity, Friend>();
+                    cfg.CreateMap<CommunityEntity, Community>();
+                    cfg.CreateMap<TalkEntity, Talk>().AfterMap(
+                        (src, dest) =>
+                        {
+                            foreach (string speakerId in src.SpeakerIds)
+                            {
+                                var speaker = auditRealm.Find<Speaker>(speakerId);
+
+                                dest.Speakers.Add(speaker);
+                            }
+                        });
+                    cfg.CreateMap<MeetupEntity, Meetup>().AfterMap(
+                        (src, dest) =>
+                            {
+                                foreach (var sessionEntity in src.Sessions)
+                                {
+                                    dest.Sessions.Add(new Session
+                                    {
+                                        StartTime = sessionEntity.StartTime,
+                                        EndTime = sessionEntity.EndTime,
+                                        Talk = auditRealm.Find<Talk>(sessionEntity.TalkId)
+                                    });
+                                }
+
+                                foreach (string friendId in src.FriendIds)
+                                {
+                                    var friend = auditRealm.Find<Friend>(friendId);
+                                    dest.Friends.Add(friend);
+                                }
+
+                                dest.Venue = auditRealm.Find<Venue>(src.VenueId);
+                            });
+                });
+
+            return config.CreateMapper();
         }
 
         private class UpdatedFile
