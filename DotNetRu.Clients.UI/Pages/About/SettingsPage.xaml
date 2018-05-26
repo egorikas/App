@@ -11,9 +11,10 @@
     x:Name="AboutPage"
     Title="{Binding Resources[About]}"
     Icon="tab_about.png"
-    NavigationPage.BackButtonTitle="Info">
+    NavigationPage.BackButtonTitle="Info"
+    BackgroundColor="Red">
 
-    <TableView Intent="Settings" HasUnevenRows="True">
+    <TableView Intent="Data" HasUnevenRows="True">
         <TableRoot>
             <TableSection Title="{Binding Resources[AboutDotNetRu]}">
                 <ViewCell>
@@ -37,7 +38,7 @@
                         <Label Text="{Binding Resources[AboutTextDetail]}" Style="{DynamicResource EvolveListItemTextStyle}" Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"/>
                     </Grid>
                 </ViewCell>
-                <TextCell Text="{Binding Resources[Friends]}" StyleId="disclosure" xfg:CellGloss.BackgroundColor="White"/>
+                <TextCell xfg:CellGloss.BackgroundColor="White" Text="{Binding Resources[Friends]}" StyleId="disclosure" />
             </TableSection>
 
             <TableSection Title="{Binding Resources[OurCommunities]}">
@@ -52,30 +53,30 @@
                 <TextCell                    
                     Text="{Binding Resources[CreatedBy]}"
                     Command="{Binding OpenCreditsCommand}"
-                    xfg:CellGloss.BackgroundColor="White"
+                    
                     StyleId="disclosure"/>
                 <TextCell                    
                     Text="{Binding Resources[IssueTracker]}"
                     Command="{Binding LaunchBrowserCommand}"
                     CommandParameter="{Binding Source={x:Static utils:AboutThisApp.IssueTracker}}"
-                    xfg:CellGloss.BackgroundColor="White"
+                    
                     StyleId="disclosure"/>
                 <TextCell                    
                     Text="{Binding Resources[TechnologyUsed]}"
                     Command="{Binding OpenTechnologiesUsedCommand}"
-                    xfg:CellGloss.BackgroundColor="White"
+                    
                     StyleId="disclosure"/>
             </TableSection>
 
             <TableSection Title="Settings">
-                <ViewCell>
-                    <Picker BackgroundColor="White" Margin="10" ItemsSource="{Binding Languages}" HorizontalOptions="FillAndExpand" Title="{Binding Resources[SelectLanguage]}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" />
+                <ViewCell xfg:CellGloss.BackgroundColor="White">
+                    <Picker Margin="10" ItemsSource="{Binding Languages}" HorizontalOptions="FillAndExpand" Title="{Binding Resources[SelectLanguage]}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" />
                 </ViewCell>
             </TableSection>
 
             <TableSection Title="{Binding Resources[AboutApp]}">
-                <TextCell Text="{Binding AppVersion}" xfg:CellGloss.BackgroundColor="White"/>
-                <TextCell Text="{Binding Copyright}" xfg:CellGloss.BackgroundColor="White"/>
+                <TextCell Text="{Binding AppVersion}" />
+                <TextCell Text="{Binding Copyright}" />
             </TableSection>
         </TableRoot>
     </TableView>
